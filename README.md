@@ -1,3 +1,5 @@
+# WISET_Visualization
+
 Repository for implementing Event Recognition technology in Mobile 360 vidieo for social safety
 
 ### Subject introduction
