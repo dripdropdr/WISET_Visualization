@@ -1,7 +1,14 @@
 import numpy as np
 import sys
 import os
+import argparse
+from tqdm import tqdm
+import cv2
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--video_name', default='in_test2', type=str, help='video path')
+    return parser.parse_args()
 
 def N(image):
     from scipy.ndimage.filters import maximum_filter
@@ -23,37 +30,34 @@ def normalize_map(s_map):
 	norm_s_map = (s_map - np.min(s_map)) / (s_map.max() - s_map.min())
 	return norm_s_map    
 
-def fuse(out, video_name, frame):
+def fuse(video_name):
 
-    pred_audio_saliency = cv2.imread('/content/drive/MyDrive/output/audio_saliency_enlarged_new/{}/salmap_f_{}.png'.format(video_name, frame), 0)
-    pred_mms = cv2.imread('/content/drive/MyDrive/related_work_predictions/MMS/mono_-{}/{}.png'.format(video_name, frame), 0)
-    pred_mms = cv2.resize(pred_mms, (384, 192))
+    audio_path = os.path.join('/wiset/Output/SSSL', args.video_name ,'fixations')
+    visual_path = os.path.join('/wiset/Output/ViNet', args.video_name)
 
-    output_path0 = out + '/{}/'.format("MMS") + video_name + '/{}'.format("itti")
-    output_path1 = out + '/{}/'.format("MMS") + video_name + '/{}'.format("expo1")
-    output_path2 = out + '/{}/'.format("MMS") + video_name + '/{}'.format("expo2")
-    output_path3 = out + '/{}/'.format("MMS") + video_name + '/{}'.format("avg")
+    for frame in tqdm(range(min(len(os.listdir(audio_path)), len(os.listdir(visual_path)))), desc='fusion:'):
 
-    if not os.path.exists(output_path0):
-        os.makedirs(output_path0)
-    if not os.path.exists(output_path1):
-        os.makedirs(output_path1)
-    if not os.path.exists(output_path2):
-        os.makedirs(output_path2)
-    if not os.path.exists(output_path3):
-        os.makedirs(output_path3)
+        pred_audio_saliency = cv2.imread('/wiset/Output/SSSL/{}/fixations/salmap_f_{}.png'.format(video_name, frame), 0)
+        pred_vinet = cv2.imread('/wiset/Output/ViNet/{}/{:04d}.jpg'.format(video_name, frame+1), 0)
+        pred_vinet = cv2.resize(pred_vinet, (1080, 606))
 
-    pred_itti = 0.5*N(pred_mms) + 0.5*N(pred_audio_saliency)
-    pred_expo1 = pred_mms * np.exp(normalize_1(pred_audio_saliency))
-    pred_expo2 = pred_mms * np.exp(normalize_map(pred_audio_saliency))
-    pred_avg = 0.5 * pred_mms + 0.5 * pred_audio_saliency
+        # print('/wiset/Output/SSSL/{}/fixations/salmap_f_{}.png'.format(video_name, frame), '/wiset/Output/ViNet/{}/{:04d}.jpg'.format(video_name, frame+1))
 
-    p0 = output_path0 + '/{:05d}.png'.format(frame)
-    p1 = output_path1 + '/{:05d}.png'.format(frame)
-    p2 = output_path2 + '/{:05d}.png'.format(frame)
-    p3 = output_path3 + '/{:05d}.png'.format(frame)
+        output_path = os.path.join('/wiset/Output/Fusion', args.video_name, 'itti')
 
-    cv2.imwrite(p0, pred_itti)
-    cv2.imwrite(p1, pred_expo1)
-    cv2.imwrite(p2, pred_expo2)
-    cv2.imwrite(p3, pred_avg)
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+
+        pred_itti = 0.6*N(pred_audio_saliency) + 0.4*N(pred_vinet)
+
+        p = output_path + '/{:04d}.png'.format(frame)
+
+        cv2.imwrite(p, pred_itti)
+
+
+def run(args):
+    fuse(args.video_name)
+
+if __name__ == "__main__":              
+    args = parse_args()
+    run(args)

@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import cv2
 from pathlib import Path
+from tqdm import tqdm
 
 FIXATION_FOLDER = '/content/output/fixations/'
 
@@ -30,31 +31,29 @@ class Point:
         self.ClId = ClId
 
 class vaODV:
-    def __init__(self, odv_folder, user_dataset, modality, odv_shape=None):
+    def __init__(self, vid_path, pred_path, odv_shape=None):
         # modaliy
-        self.modality = modality
-
+        # self.modality = modality
         # odv folder
-        self.odv_folder = odv_folder
+        self.vid_path = vid_path
         # odv path
-        self.userdata_path = self.get_userdata_path(user_dataset, modality)
+        self.pred_path = pred_path
+        # self.userdata_path = self.get_userdata_path(user_dataset)
         # list odvs
-        self.odv_list = self.get_ODVs()
-
+        # self.odv_list = self.get_ODVs()
         # given shape
         self.odv_shape = odv_shape
-
         # odv metadata        
         self.vid_info = {}
 
 
-    def get_ODVs(self):
-        list_vid = [k for k in glob.glob(os.path.join(self.userdata_path, '*/'))]
-        return list_vid
+    # def get_ODVs(self):
+    #     list_vid = [k for k in glob.glob(os.path.join(self.userdata_path, '*/'))]
+    #     return list_vid
 
-    def get_userdata_path(self, user_dataset, modality):
-        st_fixation_folder = os.path.join(str(user_dataset)+'/', modality)
-        return st_fixation_folder
+    # def get_userdata_path(self, user_dataset, modality):
+    #     st_fixation_folder = os.path.join(str(user_dataset)+'/', modality)
+    #     return st_fixation_folder
 
 
     def get_odvInfo(self, odv_name):
@@ -64,18 +63,18 @@ class vaODV:
         self.vid_info['nframes']    = vid.get_meta_data()['nframes']
         self.vid_info['size']       = vid.get_meta_data()['size']
         self.vid_info['fps']        = vid.get_meta_data()['fps']
-        self.vid_info['duration']   = int(vid.get_meta_data()['duration']) * int(self.vid_info['fps'])
+        self.vid_info['duration']   = int(vid.get_meta_data()['duration']) * 30
 
         if self.odv_shape is None:
             self.odv_shape =  [self.vid_info['size'][1], self.vid_info['size'][0], 3]
 
 
-    def get_participantNumber(self, odv_name):
-        return glob.glob(os.path.join(self.userdata_path, odv_name+'/*.csv'))
+    # def get_participantNumber(self, odv_name):
+    #     return glob.glob(os.path.join(self.userdata_path, odv_name+'/*.csv'))
 
-    def display_status(self, count, odv_name):
-        print("Modality: {modality}    ODV: {odv_name}   {f_count}/{list_vid}"
-        .format(modality=self.modality, odv_name=odv_name, f_count=count+1, list_vid=len(self.odv_list)))
+    # def display_status(self, count, odv_name):
+    #     print("Modality: {modality}    ODV: {odv_name}   {f_count}/{list_vid}"
+    #     .format(modality=self.modality, odv_name=odv_name, f_count=count+1, list_vid=len(self.odv_list)))
 
     def filter_par(self, par, f, f_next=1):
         df      = pd.read_csv(par)
@@ -189,20 +188,19 @@ class vaODV:
         # get the metadata (vid_info) for a given ODV
         self.get_odvInfo(odv_name)
 
-        # number of participants
-        self.participants = self.get_participantNumber(odv_name)
+        self.pred = [os.path.join(self.pred_path, 'pred.csv')]
 
         # create a folder for fixation
-        fix_folder = os.path.join(FIXATION_FOLDER + '/' + self.modality, odv_name)
+        fix_folder = os.path.join(self.pred_path, 'fixations')
         Path(fix_folder).mkdir(parents=True, exist_ok=True)
 
         fixation_maps = []
-        for f in range(self.vid_info['duration']):
+        for f in tqdm(range(self.vid_info['duration']), desc='generate fixation map:'):
             self.init_map()
             print(":::...Second {second} / {duration}".format(second=f, duration=self.vid_info['duration']))
 
 
-            for par in self.participants:
+            for par in self.pred:
                 print("::. ODV #{}".format(os.path.basename(par)))
                 data_par = self.filter_par(par, f)
                 Fixations_person = self.clustering(data_par)
@@ -210,6 +208,6 @@ class vaODV:
                 self.fixation_map += Fixations_person
 
 
-            imageio.imwrite(os.path.join(fix_folder,'salmap_f_' + str(f) + '.png'), fix2sal(self.fixation_map))
+            imageio.imwrite(os.path.join(fix_folder,'salmap_f_' + str(f) + '.png'), fix2sal(self.fixation_map).astype(np.uint8))
             fixation_maps.append(self.fixation_map)
         return fixation_maps                
